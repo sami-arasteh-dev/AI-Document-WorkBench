@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GapGPT Document Workbench</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#202733;font-family:Tahoma,"Segoe UI",Arial,sans-serif}
+header{background:#17212b;color:#fff;padding:18px 24px;box-shadow:0 2px 8px #0002}
+header h1{margin:0;font-size:22px} header p{margin:7px 0 0;color:#cbd5df;font-size:13px}
+nav{display:flex;gap:6px;background:#fff;border-bottom:1px solid #d7dce2;padding:8px 16px;position:sticky;top:0;z-index:5}
+nav button{border:0;background:#f1f3f6;padding:10px 16px;border-radius:7px;cursor:pointer;font-weight:700;color:#3b4652}
+nav button.active{background:#17212b;color:#fff}
+main{max-width:1250px;margin:22px auto;padding:0 16px}.tab{display:none}.tab.active{display:block}
+.card{background:#fff;border:1px solid #d8dde3;border-radius:10px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px #0000000b}
+h2{font-size:17px;margin:0 0 14px}h3{font-size:14px;margin:16px 0 8px}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 6px}
+input,textarea,select{width:100%;border:1px solid #c9d0d8;border-radius:7px;padding:10px;font:inherit;background:#fff}
+textarea{min-height:120px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.drop{border:2px dashed #aeb8c4;border-radius:9px;padding:28px;text-align:center;background:#fafbfc;cursor:pointer}
+.drop.drag{background:#eef5ff;border-color:#4277b8}.files{margin-top:12px}.file{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid #e0e4e9;border-radius:6px;margin:6px 0;background:#fafafa}
+button.primary{background:#1f5f99;color:#fff;border:0;border-radius:7px;padding:11px 18px;font-weight:700;cursor:pointer}
+button.secondary{background:#e9edf1;color:#26313d;border:0;border-radius:7px;padding:10px 14px;font-weight:700;cursor:pointer}
+button.danger{background:#a73535;color:#fff;border:0;border-radius:7px;padding:8px 12px;cursor:pointer}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.status{padding:11px;border-radius:7px;background:#f3f5f7;font-size:13px;white-space:pre-wrap}.ok{background:#edf8f0}.err{background:#fff0f0;color:#8d2020}
+small.muted{color:#68727d}.check{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px}.check input{width:auto}
+#output{min-height:300px;border:1px solid #d5dbe1;border-radius:8px;padding:22px;background:#fff;line-height:2}
+.progress{height:9px;background:#e5e9ee;border-radius:9px;overflow:hidden;margin:10px 0}.bar{height:100%;width:0;background:#1f5f99;transition:.2s}
+pre{white-space:pre-wrap;word-break:break-word}
+.note{font-size:12px;color:#5f6975;line-height:1.8}
+@media(max-width:800px){.row,.row3{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff}.no-print,header,nav,.actions,#statusCard{display:none!important}
+  main{max-width:none;margin:0;padding:0}.card{border:0;box-shadow:none;padding:0}
+  #output{border:0;padding:0}
+  @page{size:A4;margin:18mm 16mm}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>GapGPT Document Workbench</h1>
+  <p>تحلیل چند فایل، مدیریت متن‌های حجیم، ارسال مرحله‌ای به مدل و تولید خروجی رسمی قابل چاپ A4</p>
+</header>
+
+<nav class="no-print">
+  <button class="tabBtn active" data-tab="work">کارگاه تحلیل</button>
+  <button class="tabBtn" data-tab="settings">تنظیمات مدل و API</button>
+  <button class="tabBtn" data-tab="help">راهنما</button>
+</nav>
+
+<main>
+<section id="work" class="tab active">
+  <div class="card">
+    <h2>۱) اسناد و اطلاعات پرونده</h2>
+    <div id="drop" class="drop">PDFها را اینجا رها کنید یا برای انتخاب فایل کلیک کنید<br><small class="muted">استخراج متن در مرورگر انجام می‌شود؛ فایل PDF مستقیماً برای API ارسال نمی‌شود.</small></div>
+    <input id="fileInput" type="file" accept=".pdf,application/pdf" multiple hidden>
+    <div id="fileList" class="files"></div>
+
+    <div class="row">
+      <div>
+        <label>وب‌سایت شرکت / منبع تکمیلی</label>
+        <input id="website" placeholder="https://example.com">
+      </div>
+      <div>
+        <label>نام شرکت / پروژه</label>
+        <input id="company" placeholder="نام شرکت یا پروژه">
+      </div>
+    </div>
+    <label>اطلاعات تکمیلی که باید در تحلیل لحاظ شود</label>
+    <textarea id="extra" placeholder="مثلاً سمت مورد نظر، محدودیت‌های زمانی، بودجه، افراد کلیدی، اهداف جلسه و ..."></textarea>
+  </div>
+
+  <div class="card">
+    <h2>۲) درخواست شما از مدل</h2>
+    <textarea id="prompt" style="min-height:180px" placeholder="مثلاً: با بررسی همه اسناد، ابتدا اطلاعات ناقص لازم برای تدوین برنامه عملیاتی را استخراج کن و فهرست سوالات دقیق و غیرتکراری برای ارسال به مسئول شرکت تهیه کن."></textarea>
+    <div class="row3">
+      <div><label>حداکثر طول هر قطعه (کاراکتر)</label><input id="chunkSize" type="number" value="12000" min="3000" max="30000"></div>
+      <div><label>هم‌پوشانی قطعات</label><input id="overlap" type="number" value="800" min="0" max="5000"></div>
+      <div><label>حداکثر تعداد قطعات در هر سند</label><input id="maxChunks" type="number" value="80" min="1" max="500"></div>
+    </div>
+    <label class="check"><input id="useWebsite" type="checkbox"> اگر وب‌سایت وارد شده، از مدل بخواه در صورت امکان آن را نیز بررسی کند.</label>
+    <div class="actions">
+      <button class="primary" id="run">تحلیل و تولید خروجی</button>
+      <button class="secondary" id="clear">پاک کردن پرونده</button>
+    </div>
+  </div>
+
+  <div class="card no-print" id="statusCard">
+    <h2>وضعیت پردازش</h2>
+    <div id="status" class="status">آماده</div>
+    <div class="progress"><div id="bar" class="bar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="actions no-print">
+      <button class="primary" id="print">چاپ / ذخیره PDF</button>
+      <button class="secondary" id="saveHtml">خروجی HTML رسمی</button>
+      <button class="secondary" id="copy">کپی متن</button>
+    </div>
+    <h2>خروجی نهایی</h2>
+    <div id="output"><p class="muted">خروجی مدل اینجا نمایش داده می‌شود.</p></div>
+  </div>
+</section>
+
+<section id="settings" class="tab">
+  <div class="card">
+    <h2>تنظیمات API و مدل</h2>
+    <p class="note">کلید API فقط در مرورگر شما نگهداری می‌شود. برای امنیت، آن را داخل فایل HTML ننویسید. اگر این صفحه روی کامپیوتر مشترک استفاده می‌شود، کلید را ذخیره نکنید.</p>
+    <label>Endpoint</label>
+    <input id="endpoint" value="https://api.gapgpt.app/v1/chat/completions">
+    <label>API Key</label>
+    <input id="apiKey" type="password" autocomplete="off" placeholder="کلید API را وارد کنید">
+    <div class="row3">
+      <div><label>نام مدل</label><input id="model" value="gpt-4o"></div>
+      <div><label>Temperature</label><input id="temperature" type="number" value="0.2" min="0" max="2" step="0.1"></div>
+      <div><label>Max tokens</label><input id="maxTokens" type="number" value="5000" min="100" max="20000"></div>
+    </div>
+    <label class="check"><input id="rememberKey" type="checkbox"> ذخیره API Key در LocalStorage این مرورگر</label>
+    <div class="actions">
+      <button class="primary" id="saveSettings">ذخیره تنظیمات</button>
+      <button class="secondary" id="forgetKey">حذف کلید ذخیره‌شده</button>
+    </div>
+    <div id="settingsStatus" class="status" style="margin-top:12px">تنظیمات در این مرورگر ذخیره می‌شوند.</div>
+  </div>
+</section>
+
+<section id="help" class="tab">
+  <div class="card">
+    <h2>راهنمای سریع</h2>
+    <p class="note">
+      ۱) در تب تنظیمات Endpoint، مدل و کلید را وارد کنید. ۲) PDFهای جلسه، رزومه، پروپوزال و سایر اسناد را اضافه کنید.
+      ۳) درخواست دقیق خود را بنویسید. ۴) برنامه تحلیل را اجرا کنید.
+      برنامه ابتدا متن PDFها را در مرورگر استخراج و به قطعات محدود تقسیم می‌کند، سپس هر قطعه را جداگانه برای تحلیل زمینه‌ای می‌فرستد و در مرحله نهایی خلاصه‌های ساختاریافته را برای تولید پاسخ نهایی به مدل می‌دهد.
+    </p>
+    <p class="note"><b>نکته امنیتی:</b> چون این HTML مستقیماً از مرورگر به API متصل می‌شود، سرویس API باید CORS مناسب برای Origin شما داشته باشد. اگر خطای CORS/NetworkError گرفتید، نسخه Local Proxy پایتون راه‌حل مطمئن‌تری است.</p>
+    <p class="note"><b>نکته کیفیت:</b> PDFهای اسکن‌شده که متن قابل انتخاب ندارند، نیازمند OCR هستند. این نسخه متن PDF را استخراج می‌کند؛ OCR را می‌توان در نسخه بعدی اضافه کرد.</p>
+  </div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script>
+const $=id=>document.getElementById(id);
+let files=[], pdfjsLib=null, finalText="";
+
+(async()=>{
+  try{
+    const mod=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs");
+    pdfjsLib=mod;
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+  }catch(e){ setStatus("خطا در بارگذاری PDF.js. اتصال اینترنت را بررسی کنید.",true); }
+})();
+
+document.querySelectorAll(".tabBtn").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tabBtn").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); $(b.dataset.tab).classList.add("active");
+});
+
+$("drop").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=e=>addFiles([...e.target.files]);
+["dragenter","dragover"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.add("drag")}));
+["dragleave","drop"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.remove("drag")}));
+$("drop").addEventListener("drop",e=>addFiles([...e.dataTransfer.files].filter(f=>f.type==="application/pdf"||f.name.toLowerCase().endsWith(".pdf"))));
+
+function addFiles(fs){ files.push(...fs); renderFiles(); }
+function renderFiles(){
+  $("fileList").innerHTML=files.map((f,i)=>`<div class="file"><span>${esc(f.name)} — ${(f.size/1024/1024).toFixed(2)} MB</span><button class="danger" onclick="removeFile(${i})">حذف</button></div>`).join("");
+}
+window.removeFile=i=>{files.splice(i,1);renderFiles()};
+
+function esc(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function setStatus(s,error=false){$("status").textContent=s;$("status").className="status "+(error?"err":"");}
+function progress(v){$("bar").style.width=Math.max(0,Math.min(100,v))+"%";}
+
+function chunkText(text,size,overlap,maxChunks){
+  const out=[]; let p=0;
+  while(p<text.length && out.length<maxChunks){
+    let e=Math.min(text.length,p+size);
+    if(e<text.length){
+      const cut=text.lastIndexOf("\n",e);
+      if(cut>p+size*.65)e=cut;
+    }
+    out.push(text.slice(p,e));
+    p=Math.max(e-overlap,p+1);
+  }
+  return out;
+}
+
+async function extractPDF(file){
+  if(!pdfjsLib) throw new Error("PDF.js هنوز بارگذاری نشده است.");
+  const data=new Uint8Array(await file.arrayBuffer());
+  const pdf=await pdfjsLib.getDocument({data}).promise;
+  let text="";
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    text+=`\\n\\n--- صفحه ${i} ---\\n`+tc.items.map(x=>x.str).join(" ");
+  }
+  return text.trim();
+}
+
+function settings(){
+  return {
+    endpoint:$("endpoint").value.trim(),
+    key:$("apiKey").value.trim(),
+    model:$("model").value.trim(),
+    temperature:Number($("temperature").value),
+    max_tokens:Number($("maxTokens").value)
+  };
+}
+
+async function callAPI(messages, max_tokens=null){
+  const s=settings();
+  if(!s.endpoint||!s.key||!s.model) throw new Error("Endpoint، مدل یا API Key تنظیم نشده است.");
+  const body={model:s.model,messages,temperature:s.temperature};
+  body.max_tokens=max_tokens||s.max_tokens;
+  const r=await fetch(s.endpoint,{method:"POST",headers:{
+    "Authorization":"Bearer "+s.key,"Content-Type":"application/json"
+  },body:JSON.stringify(body)});
+  const raw=await r.text();
+  if(!r.ok) throw new Error("HTTP "+r.status+" — "+raw.slice(0,1200));
+  let j; try{j=JSON.parse(raw)}catch(e){throw new Error("پاسخ API JSON معتبر نیست: "+raw.slice(0,1000))}
+  return j?.choices?.[0]?.message?.content ?? raw;
+}
+
+function systemPrompt(){
+ return `تو یک دستیار ارشد تحلیل اسناد و برنامه‌ریزی مدیریتی هستی. متن‌های ارسالی ممکن است بخشی از یک یا چند سند باشند.
+فقط بر اساس شواهد موجود نتیجه‌گیری کن؛ موارد نامطمئن را با برچسب «نیازمند تأیید» مشخص کن.
+از ساختن اطلاعات، اعداد، تعهدات یا نقل‌قول‌های جعلی خودداری کن.
+در تحلیل قطعات، نکات کلیدی، افراد/سمت‌ها، تاریخ‌ها، تصمیم‌ها، تعهدات، ابهام‌ها، نیازهای اطلاعاتی و ارتباط با درخواست کاربر را ساختاریافته استخراج کن.`;
+}
+
+async function run(){
+  try{
+    if(!files.length) throw new Error("حداقل یک PDF انتخاب کنید.");
+    if(!$("prompt").value.trim()) throw new Error("درخواست خود را وارد کنید.");
+    const s=settings(); if(!s.key) throw new Error("API Key را در تب تنظیمات وارد کنید.");
+    finalText="";
+    progress(0);
+    setStatus("در حال استخراج متن PDFها...");
+    const docs=[];
+    for(let i=0;i<files.length;i++){
+      const text=await extractPDF(files[i]);
+      docs.push({name:files[i].name,text});
+      progress((i+1)/files.length*20);
+    }
+    let packets=[], totalChunks=0;
+    for(const d of docs) totalChunks+=chunkText(d.text,Number($("chunkSize").value),Number($("overlap").value),Number($("maxChunks").value)).length;
+    let done=0;
+    for(const d of docs){
+      const chunks=chunkText(d.text,Number($("chunkSize").value),Number($("overlap").value),Number($("maxChunks").value));
+      for(let i=0;i<chunks.length;i++){
+        setStatus(`تحلیل قطعه ${i+1} از ${chunks.length} — ${d.name}`);
+        const msg=`درخواست کلی کاربر:
+${$("prompt").value}
+
+اطلاعات تکمیلی:
+${$("extra").value}
+
+شرکت/پروژه:
+${$("company").value}
+
+وب‌سایت:
+${$("website").value}
+
+سند: ${d.name}
+قطعه ${i+1} از ${chunks.length}
+
+متن قطعه:
+${chunks[i]}
+
+خروجی این مرحله را به شکل یک «بسته شواهد» فشرده تولید کن که برای مرحله نهایی قابل استفاده باشد.`;
+        const ans=await callAPI([{role:"system",content:systemPrompt()},{role:"user",content:msg}],Math.min(2500,s.max_tokens));
+        packets.push(`### ${d.name} / قطعه ${i+1}\n${ans}`);
+        done++; progress(20+done/totalChunks*55);
+      }
+    }
+    setStatus("قطعات تحلیل شدند؛ در حال ساخت پاسخ نهایی...");
+    let evidence=packets.join("\n\n");
+    // Keep final prompt bounded if there are many packets.
+    const maxEvidence=90000;
+    if(evidence.length>maxEvidence) evidence=evidence.slice(0,maxEvidence)+"\n\n[ادامه بسته‌های شواهد برای حفظ محدودیت پیام حذف شد.]";
+    const finalPrompt=`درخواست اصلی کاربر:
+${$("prompt").value}
+
+اطلاعات تکمیلی:
+${$("extra").value}
+
+شرکت/پروژه:
+${$("company").value}
+
+وب‌سایت:
+${$("website").value}
+
+${$("useWebsite").checked?"در صورت دسترسی و پشتیبانی API، وب‌سایت را نیز برای اطلاعات تکمیلی بررسی کن؛ در غیر این صورت صریحاً بگو که بررسی وب‌سایت انجام نشده است.":""}
+
+بسته‌های شواهد استخراج‌شده از اسناد:
+${evidence}
+
+اکنون یک پاسخ نهایی حرفه‌ای و اجرایی تولید کن. اگر درخواست مربوط به برنامه کاری است، اهداف، دامنه کار، خروجی‌های قابل تحویل، مسئولیت‌ها، پیش‌نیازها، ریسک‌ها، وابستگی‌ها، KPIهای پیشنهادی و جدول زمان‌بندی دقیق را تا حدی که شواهد اجازه می‌دهد ارائه کن.
+اگر اطلاعاتی برای برنامه دقیق کافی نیست، ابتدا «اطلاعات موردنیاز / سوالات تکمیلی» را جداگانه و شماره‌گذاری‌شده ارائه کن.
+پاسخ را با Markdown تمیز و مناسب تبدیل به گزارش HTML ارائه کن.`;
+    const ans=await callAPI([{role:"system",content:systemPrompt()},{role:"user",content:finalPrompt}],s.max_tokens);
+    finalText=ans;
+    $("output").innerHTML=markdownToHtml(ans);
+    progress(100); setStatus("تکمیل شد.");
+  }catch(e){setStatus(e.message||String(e),true);}
+}
+
+function markdownToHtml(md){
+  let x=esc(md);
+  x=x.replace(/^### (.*)$/gm,"<h3>$1</h3>");
+  x=x.replace(/^## (.*)$/gm,"<h2>$1</h2>");
+  x=x.replace(/^# (.*)$/gm,"<h1>$1</h1>");
+  x=x.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>");
+  x=x.replace(/^\- (.*)$/gm,"<li>$1</li>");
+  x=x.replace(/(<li>.*<\/li>\\n?)+/g,m=>"<ul>"+m+"</ul>");
+  x=x.replace(/\n/g,"<br>");
+  return x;
+}
+
+function outputHtml(){
+ const title=$("company").value.trim()||"گزارش تحلیلی و برنامه پیشنهادی";
+ return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>body{font-family:Tahoma,"Segoe UI",Arial,sans-serif;line-height:2;color:#202733;max-width:850px;margin:auto;padding:28px}
+h1{font-size:24px;border-bottom:2px solid #333;padding-bottom:10px}h2{font-size:19px;margin-top:25px;border-bottom:1px solid #aaa;padding-bottom:5px}h3{font-size:16px}
+table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:7px}ul{line-height:2}
+.meta{font-size:12px;color:#555;margin-bottom:25px}@page{size:A4;margin:18mm 16mm}@media print{body{padding:0;max-width:none}}</style>
+</head><body><h1>${esc(title)}</h1><div class="meta">گزارش تولیدشده توسط GapGPT Document Workbench — ${new Date().toLocaleString("fa-IR")}</div>${$("output").innerHTML}</body></html>`;
+}
+
+$("run").onclick=run;
+$("print").onclick=()=>window.print();
+$("copy").onclick=async()=>{await navigator.clipboard.writeText(finalText||$("output").innerText);alert("کپی شد.")};
+$("saveHtml").onclick=()=>{
+ const blob=new Blob([outputHtml()],{type:"text/html;charset=utf-8"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="گزارش-تحلیلی.html";a.click();URL.revokeObjectURL(a.href);
+};
+$("clear").onclick=()=>{files=[];renderFiles();$("prompt").value="";$("extra").value="";$("output").innerHTML='<p class="muted">خروجی پاک شد.</p>';finalText="";progress(0);setStatus("پرونده پاک شد.")};
+
+function loadSettings(){
+ for(const id of ["endpoint","model","temperature","maxTokens"]){
+   const v=localStorage.getItem("gg_"+id); if(v!==null) $(id).value=v;
+ }
+ if(localStorage.getItem("gg_key")){$("apiKey").value=localStorage.getItem("gg_key");$("rememberKey").checked=true}
+}
+$("saveSettings").onclick=()=>{
+ ["endpoint","model","temperature","maxTokens"].forEach(id=>localStorage.setItem("gg_"+id,$(id).value));
+ if($("rememberKey").checked && $("apiKey").value) localStorage.setItem("gg_key",$("apiKey").value);
+ else localStorage.removeItem("gg_key");
+ $("settingsStatus").textContent="تنظیمات ذخیره شد.";
+ $("settingsStatus").className="status ok";
+};
+$("forgetKey").onclick=()=>{localStorage.removeItem("gg_key");$("apiKey").value="";$("rememberKey").checked=false;$("settingsStatus").textContent="کلید ذخیره‌شده حذف شد."};
+loadSettings();
+</script>
+</body></html>
